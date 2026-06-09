@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "esnext",
     "module": "esnext",
+    //Ignoring depecrations om baseUrl and moduleResolution since they are required for Vue still
+    "ignoreDeprecations": "6.0",
     "baseUrl": "./",
     "moduleResolution": "node",
     "paths": {
@@ -12,8 +14,19 @@
     "lib": [
       "esnext",
       "dom",
-      "dom.iterable",
-      "scripthost"
-    ]
-  }
+      "dom.iterable"
+    ],
+    "jsx": "preserve",
+    "strict": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
