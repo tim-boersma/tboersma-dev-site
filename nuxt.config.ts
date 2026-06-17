@@ -23,6 +23,7 @@ export default defineNuxtConfig({
   debug: true,
   alias: {
     '~': fileURLToPath(new URL('./', import.meta.url)),
+    '@': fileURLToPath(new URL('./app/', import.meta.url)),
   },
   postcss: {
     plugins: {

@@ -1,5 +1,5 @@
 import { getAzureHttpClient } from '@/api/httpClient';
-import { trackProxyError } from '../../utils/app-insights';
+import { trackProxyError } from '~/server/utils/app-insights';
 
 interface ToggleBody {
   state: boolean;

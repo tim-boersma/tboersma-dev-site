@@ -21,11 +21,11 @@ const isOnline = computed(() => {
 
   if (typeof status.value === 'string') {
     const normalized = status.value.toLowerCase();
-    if (normalized.includes('running') || normalized.includes('online') || normalized === 'on') {
+    if (normalized.includes('running') || normalized.includes('starting')) {
       return true;
     }
 
-    if (normalized.includes('stopped') || normalized.includes('offline') || normalized === 'off') {
+    if (normalized.includes('stopped') || normalized.includes('stopping')) {
       return false;
     }
   }
