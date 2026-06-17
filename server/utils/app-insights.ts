@@ -4,7 +4,7 @@ let isInitialized = false;
 
 const getTelemetryClient = () => {
   const config = useRuntimeConfig();
-  const connectionString = config.appInsightsConnectionString || process.env.APPLICATIONINSIGHTS_CONNECTION_STRING || '';
+  const connectionString = config.appInsightsConnectionString;
 
   if (!connectionString) {
     return null;

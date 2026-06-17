@@ -1,5 +1,3 @@
-import { requiredRuntimeConfigKeys, runtimeConfigEnvVarByKey } from '../utils/runtime-config-schema';
-
 import type { RuntimeConfig } from 'nuxt/schema';
 
 export const requiredRuntimeConfigKeys = [
