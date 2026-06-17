@@ -44,8 +44,8 @@ jobs:
       - name: Generate .env.production
         run: |
           cat <<EOF > .env.production
-          AZURE_FUNCTION_URL=${{ secrets.AZURE_FUNCTION_URL }}
-          DB_PASAPI_FUNCTION_MASTER_KEYSWORD=${{ secrets.API_FUNCTION_MASTER_KEY }}
+          AZURE_FUNCTION_URL=${{ vars.AZURE_FUNCTION_URL }}
+          API_FUNCTION_MASTER_KEY=${{ secrets.API_FUNCTION_MASTER_KEY }}
           APPLICATIONINSIGHTS_CONNECTION_STRING=${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}
           EOF
 
