@@ -1,5 +1,6 @@
 import { getAzureHttpClient } from '@/api/httpClient';
 import { trackProxyError } from '~/server/utils/app-insights';
+import { toError } from '~/server/utils/lib';
 
 interface ToggleBody {
   state: boolean;
@@ -22,15 +23,16 @@ export default defineEventHandler(async (event) => {
 
     return response.data;
   } catch (error: any) {
-    trackProxyError(error, {
+    var trackedError = toError(error);
+    trackProxyError(trackedError, {
       route: '/api/vm/toggle',
       targetPath: `/api/vm/manual?state=${body.state}`,
       method: 'PUT',
-      upstreamStatus: error?.statusCode || error?.response?.status,
+      upstreamStatus: error?.status || error?.response?.status,
     });
 
     throw createError({
-      statusCode: error?.statusCode || error?.response?.status || 500,
+      statusCode: error?.status || error?.response?.status || 500,
       statusMessage: error?.message || 'Failed to toggle VM',
     });
   }

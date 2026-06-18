@@ -28,14 +28,14 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - name: Generate .env.production
+      - name: Generate .env
         shell: bash
         run: |
           printf "%s\n" \
-            "AZURE_FUNCTION_URL=${{ vars.AZURE_FUNCTION_URL }}" \
-            "API_FUNCTION_MASTER_KEY=${{ secrets.API_FUNCTION_MASTER_KEY }}" \
-            "APPLICATIONINSIGHTS_CONNECTION_STRING=${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}" \
-            > .env.production
+            "NUXT_AZURE_FUNCTION_URL=${{ vars.AZURE_FUNCTION_URL }}" \
+            "NUXT_API_FUNCTION_MASTER_KEY=${{ secrets.API_FUNCTION_MASTER_KEY }}" \
+            "NUXT_APPLICATIONINSIGHTS_CONNECTION_STRING=${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}" \
+            > .env
     
 
       - name: Build And Deploy

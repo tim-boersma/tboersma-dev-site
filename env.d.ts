@@ -10,7 +10,7 @@ declare module 'nuxt/schema' {
   interface RuntimeConfig {
     azureFunctionUrl: string
     apiFunctionMasterKey: string
-    appInsightsConnectionString: string
+    applicationinsightsConnectionString: string
   }
   interface PublicRuntimeConfig {
   }

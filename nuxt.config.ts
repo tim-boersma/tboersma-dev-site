@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { config as dotenvConfig } from 'dotenv';
 import Aura from '@primeuix/themes/aura';
 
-dotenvConfig({ path: '.env.local' });
+dotenvConfig({ path: '.env' });
 
 export default defineNuxtConfig({
   compatibilityDate: '2026-06-15',
@@ -12,7 +12,7 @@ export default defineNuxtConfig({
   ],
   primevue: {
     options: {
-      theme: {
+      theme: {  
         preset: Aura
       }
     }
@@ -35,10 +35,12 @@ export default defineNuxtConfig({
     'primeicons/primeicons.css',
   ],
   runtimeConfig: {
-    azureFunctionUrl: process.env.AZURE_FUNCTION_URL,
-    apiFunctionMasterKey: process.env.API_FUNCTION_MASTER_KEY,
-    appInsightsConnectionString: process.env.APPLICATIONINSIGHTS_CONNECTION_STRING || '',
+    //.env variables prefixed with NUXT_ are automatically filled in
+    azureFunctionUrl: '',
+    apiFunctionMasterKey: '',
+    applicationinsightsConnectionString: '',
     public: {
+      //.env variables prefixed with NUXT_PUBLIC_ are automatically added
     },
   },
   ssr: false,

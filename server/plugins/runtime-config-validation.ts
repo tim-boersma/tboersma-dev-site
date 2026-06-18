@@ -1,4 +1,5 @@
 import type { RuntimeConfig } from 'nuxt/schema';
+import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime';
 
 export const requiredRuntimeConfigKeys = [
   'azureFunctionUrl',

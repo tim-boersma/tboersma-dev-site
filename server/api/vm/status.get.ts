@@ -1,5 +1,6 @@
 import { getAzureHttpClient } from '@/api/httpClient';
 import { trackProxyError } from '~/server/utils/app-insights';
+import { toError } from '~/server/utils/lib';
 
 export default defineEventHandler(async () => {
   try {
@@ -8,15 +9,16 @@ export default defineEventHandler(async () => {
 
     return response.data;
   } catch (error: any) {
-    trackProxyError(error, {
+    var trackedError = toError(error);
+    trackProxyError(trackedError, {
       route: '/api/vm/status',
       targetPath: '/api/vm/status',
       method: 'GET',
-      upstreamStatus: error?.statusCode || error?.response?.status,
+      upstreamStatus: error?.status || error?.response?.status,
     });
 
     throw createError({
-      statusCode: error?.statusCode || error?.response?.status || 500,
+      statusCode: error?.status || error?.response?.status || 500,
       statusMessage: error?.message || 'Failed to fetch VM status',
     });
   }
