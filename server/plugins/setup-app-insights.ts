@@ -1,4 +1,5 @@
 import appInsights from 'applicationinsights';
+import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime';
 
 export default defineNitroPlugin(() => {
   const config = useRuntimeConfig();

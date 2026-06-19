@@ -1,51 +1,27 @@
 import { getProxyHttpClient } from '@/api/httpClient';
+import type { VmState } from '~/app/types/VmState';
 
-
-interface ServiceTextResponse {
-  text: string | null;
-  error: unknown | null;
-}
 
 export const vmService = {
   /**
    * Fetch current VM status
-   * @returns {ServiceTextResponse} { text: string | null, error: unknown | null }
+   * @returns {VmState} The current VM state
    */
-  async getStatus(): Promise<ServiceTextResponse> {
-    try {
+  async getStatus(): Promise<VmState> {
       const proxyHttpClient = getProxyHttpClient();
       const response = await proxyHttpClient.get<string>('/vm/status');
-      return {
-        text: response.data,
-        error: null,
-      };
-    } catch (error) {
-      return {
-        text: null,
-        error,
-      };
-    }
+      return response.data as VmState;
   },
 
   /**
    * Toggle VM state
    * @param {boolean} state - true to turn online, false to turn offline
-   * @returns {ServiceTextResponse} { text: string | null, error: unknown | null }
+   * @returns {string} Summary message of the action performed
    */
-  async toggleVM(state: boolean): Promise<ServiceTextResponse> {
-    try {
+  async toggleVM(state: boolean): Promise<string> {
       const proxyHttpClient = getProxyHttpClient();
       const response = await proxyHttpClient.post<string>('/vm/toggle', { state });
-      return {
-        text: response.data,
-        error: null,
-      };
-    } catch (error) {
-      return {
-        text: null,
-        error,
-      };
-    }
+      return response.data;
   },
 };
 

@@ -9,9 +9,9 @@ export interface PollingConfig {
 }
 
 export const DEFAULT_POLLING_CONFIG: PollingConfig = {
-  normalInterval: 10000, // 10 seconds
+  normalInterval: 30000, // 30 seconds
   fastInterval: 1000,    // 1 second
-  fastDuration: 30000,   // 30 seconds
+  fastDuration: 120000,   // 2 minutes
 };
 
 export function createPollingController(config: PollingConfig = DEFAULT_POLLING_CONFIG) {
@@ -61,6 +61,10 @@ export function createPollingController(config: PollingConfig = DEFAULT_POLLING_
       if (pollingInterval) clearInterval(pollingInterval);
       if (fastPollingTimeout) clearTimeout(fastPollingTimeout);
       isNormalPolling = false;
+    },
+
+    get isNormalPolling() {
+      return isNormalPolling;
     },
   };
 }

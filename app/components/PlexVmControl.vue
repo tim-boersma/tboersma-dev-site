@@ -1,45 +1,61 @@
 <script setup lang="ts">
 import Button from 'primevue/button';
 import Card from 'primevue/card';
-import Divider from 'primevue/divider';
-import Message from 'primevue/message';
-import Tag from 'primevue/tag';
 import { useToggleVMMutation, useVMStatusQuery } from '@/api/hooks/vmQueries';
 import { createPollingController } from '@/composables/vmPolling';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, type Ref, watch } from 'vue';
+import { VmState } from '~/app/types/vmStateEnum';
+import { useToast } from "primevue/usetoast";
 
-const lastPolledAt = ref<Date | null>(null);
+
 const pollingController = createPollingController();
+const lastPolledAt: Ref<Date | null> = ref(null);
+const wasOnline: Ref<boolean | null> = ref(null);
+const isClicking: Ref<boolean> = ref(false);
+const now: Ref<Date> = ref(new Date());
+const toast = useToast();
 
-const { data: status, isLoading: isStatusLoading, error: statusError, refetch: refetchStatus } = useVMStatusQuery();
+const { data: status, isLoading: isStatusLoading, error: statusError, refetch: refetchStatus, isPending: isStatusPending } = useVMStatusQuery();
 const { mutateAsync: toggleVM, isLoading: isToggleLoading, error: toggleError } = useToggleVMMutation();
 
+
+watch([status, isStatusLoading], ([, newStatusLoading], [, oldStatusLoading]) => {
+  if (newStatusLoading && !oldStatusLoading) {
+    lastPolledAt.value = new Date();
+    if ((wasOnline.value === null || (canPowerOff.value && !wasOnline.value) || (canPowerOn.value && wasOnline.value)) && !pollingController.isNormalPolling) {
+      console.log('canceling fast polling')
+      pollingController.startNormalPolling(refetchStatus);
+      wasOnline.value = null;
+    }
+  }
+});
+
 const isOnline = computed(() => {
-  if (!status.value) {
-    return null;
+  if (status.value === VmState.Running || status.value === VmState.Starting) {
+    return true;
   }
 
-  if (typeof status.value === 'string') {
-    const normalized = status.value.toLowerCase();
-    if (normalized.includes('running') || normalized.includes('starting')) {
-      return true;
-    }
-
-    if (normalized.includes('stopped') || normalized.includes('stopping')) {
-      return false;
-    }
+  if (status.value === VmState.Stopped || status.value === VmState.Stopping || status.value === VmState.Deallocated || status.value === VmState.Deallocating) {
+    return false;
   }
 
   return null;
 });
 
+function clickRefresh(){
+  if(isLoading.value) return;
+  refetchStatus();
+}
+
 const isLoading = computed(() => isStatusLoading.value || isToggleLoading.value);
 
-const error = computed(() => {
-  if (statusError.value)
-    return (statusError.value as any).message || 'Failed to fetch status';
-  if (toggleError.value) return (toggleError.value as any).message || 'Failed to toggle VM';
-  return null;
+watch([statusError, toggleError], ([newStatusError, newToggleError]) => {
+  if (newStatusError) {
+    toast.add({ severity: 'error', summary: newStatusError?.message || 'Failed to fetch VM status', group: 'tc', life: 5000 });
+  }
+  if (newToggleError) {
+    toast.add({ severity: 'error', summary: newToggleError?.message || 'Failed to toggle VM power state', group: 'tc', life: 5000 });
+  }
 });
 
 const statusColor = computed(() => {
@@ -55,23 +71,26 @@ const pollingColor = computed(() => {
 });
 
 const statusText = computed(() => {
-  if (isOnline.value === null) return 'Loading...';
-  if (isOnline.value) return 'Online';
-  return 'Offline';
-});
+  if (isStatusPending.value) return 'Loading...';
 
-const refreshText = computed(() => {
-  if (isLoading.value) return 'Refreshing...';
-  return 'Refresh';
-});
-
-const statusSeverity = computed<'success' | 'danger' | 'secondary'>(() => {
-  if (isToggleLoading.value || isOnline.value === null) {
-    return 'secondary';
+  switch (status.value) {
+    case VmState.Running:
+      return 'Online';
+    case VmState.Starting:
+      return 'Starting...';
+    case VmState.Stopped:
+    case VmState.Deallocated:
+      return 'Offline';
+    case VmState.Stopping:
+      return 'Stopping...';
+    default:
+      return 'Unknown';
   }
-
-  return isOnline.value ? 'success' : 'danger';
 });
+
+const canPowerOn = computed(() => status.value === VmState.Stopped || status.value === VmState.Deallocated);
+const canPowerOff = computed(() => status.value === VmState.Running);
+const canToggle = computed(() => (canPowerOn.value || canPowerOff.value) && !isToggleLoading.value);
 
 const statusIcon = computed(() => {
   if (isLoading.value || isOnline.value === null) {
@@ -89,9 +108,10 @@ const toggleLabel = computed(() => {
   return isOnline.value ? 'Power Off VM' : 'Power On VM';
 });
 
-const toggle = async (): Promise<void> => {
+async function toggle(): Promise<void> {
   try {
     const newState = !(isOnline.value ?? false);
+    wasOnline.value = isOnline.value;
     await toggleVM(newState);
     lastPolledAt.value = new Date();
     pollingController.startFastPolling(() => refetchStatus());
@@ -100,104 +120,98 @@ const toggle = async (): Promise<void> => {
   }
 };
 
-const handlePoll = () => {
-  refetchStatus();
-  lastPolledAt.value = new Date();
-};
-
 onMounted(() => {
-  pollingController.startNormalPolling(handlePoll);
+  pollingController.startNormalPolling(refetchStatus);
 });
 
 onUnmounted(() => {
   pollingController.stopPolling();
 });
 
-const formatTime = (date: Date): string => {
-  const now = new Date();
-  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+function buttonPress() {
+  isClicking.value = true;
 
-  if (diff < 60) return 'just now';
+  setTimeout(() => {
+    isClicking.value = false;
+  }, 400);
+
+  if (!canToggle.value) return;
+  toggle();
+}
+
+onMounted(() => {
+  const interval = setInterval(() => {
+    now.value = new Date();
+  }, 1000);
+
+  onUnmounted(() => clearInterval(interval));
+});
+
+function formatTime(date: Date): string {
+  const diff = Math.max(0, Math.floor((now.value.getTime() - date.getTime()) / 1000));
+
+  if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return date.toLocaleDateString();
-};
+}
 </script>
 
 <template>
-  <div class="min-h-screen w-full bg-slate-950 p-4 sm:p-8 flex items-center justify-center">
+  <div class="min-h-screen w-full gradient-bg p-4 sm:p-8 flex items-center justify-center">
     <Card class="w-full max-w-5xl">
       <template #content>
         <div class="space-y-6">
           <!-- Header -->
-          <div class="space-y-2 pb-4 border-b border-surface-200 dark:border-surface-700">
+          <div class="pb-4 border-b border-surface-200 dark:border-gray-700">
             <p class="text-xs uppercase tracking-widest text-emerald-400">Plex Infrastructure</p>
-            <h1 class="text-3xl font-bold sm:text-4xl">Virtual Machine Control</h1>
+            <h1 class="text-3xl font-bold sm:text-4xl">Plex Virtual Machine Control Panel</h1>
             <p class="text-sm text-surface-600 dark:text-surface-400">
               Monitor live VM state and trigger power actions from a single control panel.
             </p>
           </div>
 
-          <!-- Main Content: Flex Layout -->
-          <div class="flex flex-col gap-8 lg:flex-row lg:items-center">
-            <!-- Left Section: Controls -->
-            <section class="space-y-6 flex-1">
-              <!-- Status Display -->
-              <div class="flex items-center gap-4 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 p-4">
-                <i :class="[statusIcon, isLoading ? 'pi-spin' : '', 'text-2xl text-primary']" :style="{ color: pollingColor }" />
-                <div class="flex flex-col gap-1.5">
-                  <Tag :severity="statusSeverity" :value="statusText" />
-                  <span class="text-xs text-surface-500">
-                    {{ lastPolledAt ? `Last updated ${formatTime(lastPolledAt)}` : 'Waiting for first status poll' }}
-                  </span>
-                </div>
+          <!-- Main Content -->
+          <div class="flex flex-col gap-8">
+            <!-- Centered Status Circle -->
+            <section class="flex items-center justify-center">
+              <div
+                class="relative grid status-parent h-72 w-72 place-items-center rounded-full bg-surface-100 dark:bg-surface-800">
+                <svg :class="['h-72 w-72 status-wrapper', { 'click-burst': isClicking }]" viewBox="0 0 100 100"
+                  :style="{ '--status-color': statusColor }" @click="buttonPress()" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="50" cy="50" r="35" :fill="statusColor" :class="['center-dot', { 'cursor-pointer': canToggle }]" />
+                  <text x="50" y="52" text-anchor="middle" dominant-baseline="middle" class="status-text tracking-wide"
+                    fill="currentColor">
+                    {{ statusText }}
+                  </text>
+                </svg>
               </div>
-
-              <Divider />
-
-              <!-- Action Buttons -->
-              <div class="flex flex-col gap-3 sm:flex-row">
-                <Button
-                  :label="toggleLabel"
-                  :loading="isToggleLoading"
-                  :disabled="isToggleLoading"
-                  :severity="isOnline ? 'danger' : 'success'"
-                  @click="toggle"
-                  class="flex-1"
-                />
-                <Button
-                  :label="refreshText"
-                  icon="pi pi-refresh"
-                  outlined
-                  :disabled="isLoading"
-                  @click="handlePoll"
-                  class="flex-1"
-                />
-              </div>
-
-              <!-- Error Message -->
-              <Message v-if="error" severity="error" :closable="false" class="w-full">
-                {{ error }}
-              </Message>
             </section>
 
-            <!-- Right Section: Status Ring Visualization -->
-            <section class="flex items-center justify-center flex-1">
-              <div class="relative grid h-72 w-72 place-items-center rounded-full border border-surface-300 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 shadow-md">
-                <svg class="status-circle h-60 w-60" :style="{ '--status-color': statusColor }" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(148,163,184,0.28)" stroke-width="4" />
-                  <circle cx="50" cy="50" r="45" fill="none" :stroke="statusColor" stroke-width="5" class="animated-circle" stroke-linecap="round" />
-                  <circle cx="50" cy="50" r="7" :fill="statusColor" class="center-dot" />
-                </svg>
-                <div class="absolute grid place-items-center gap-2 text-center">
-                  <!-- <ProgressSpinner
-                    v-if="isLoading"
-                    style="width: 2rem; height: 2rem"
-                    strokeWidth="8"
-                    fill="transparent"
-                    animationDuration="1s"
-                  /> -->
-                  <span class="text-lg font-semibold">{{ statusText }}</span>
+            <!-- Action Buttons -->
+            <section class="space-y-4">
+              <div class="flex flex-col gap-3 items-center justify-center w-full">
+                <Button :label="toggleLabel" :loading="isToggleLoading" :disabled="!canToggle"
+                  :severity="isOnline ? 'danger' : 'success'" @click="toggle" class="flex-1 w-80 sm:w-md" />
+                <Button label="Refresh" icon="pi pi-refresh" outlined @click="clickRefresh()" class="flex-1 w-80 sm:w-md" />
+              </div>
+            </section>
+
+            <!-- Bottom Left Status Meta -->
+            <section class="flex justify-start pt-2">
+              <div
+                class="flex items-center gap-3 rounded-lg bg-surface-50 dark:bg-surface-800 px-4 py-3">
+                <i :class="[statusIcon, isLoading ? 'pi-spin' : '', 'text-2xl text-primary']"
+                  :style="{ color: pollingColor }" />
+                <div class="flex flex-col gap-1">
+                  <!-- <Tag :severity="statusSeverity" :value="statusText" /> -->
+                  <span class="text-xs text-gray-500">
+                    {{
+                      lastPolledAt
+                        ? `Last updated ${formatTime(lastPolledAt)}`
+                        : 'Waiting for first status poll'
+                    }}
+                  </span>
                 </div>
               </div>
             </section>
@@ -209,32 +223,58 @@ const formatTime = (date: Date): string => {
 </template>
 
 <style scoped>
-.animated-circle {
-  animation: svgPulse 3s ease-in-out infinite;
-  transition: stroke 0.3s ease;
-}
-
-.center-dot {
-  transition: fill 0.3s ease;
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--status-color) 70%, transparent));
+.status-text {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  pointer-events: none;
 }
 
 .status-circle {
-  filter: drop-shadow(0 0 24px color-mix(in srgb, var(--status-color) 35%, transparent));
+  display: block;
 }
 
-@keyframes svgPulse {
+.center-dot {
+  animation: glowPulse 2.5s ease-in-out infinite;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.status-wrapper {
+  transform: scale(1);
+  transform-origin: center;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, filter;
+}
+
+.click-burst {
+  transform: scale(0.97);
+  filter: drop-shadow(0 0 10px var(--status-color));
+}
+
+
+@keyframes glowPulse {
+
   0%,
   100% {
-    stroke-dasharray: 283;
-    stroke-dashoffset: 0;
-    opacity: 0.9;
+    filter: drop-shadow(0 0 4px var(--status-color));
   }
 
   50% {
-    stroke-dasharray: 283;
-    stroke-dashoffset: 94;
-    opacity: 0.55;
+    filter: drop-shadow(0 0 6px var(--status-color));
   }
+}
+
+.status-parent:hover .center-dot {
+  animation-play-state: paused;
+  filter: drop-shadow(0 0 6px var(--status-color));
+}
+
+.gradient-bg {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(0, 110, 255, 0.12), transparent 45%),
+    radial-gradient(circle at 80% 80%, rgba(0, 190, 150, 0.10), transparent 50%),
+    radial-gradient(circle at 50% 100%, rgba(0, 80, 180, 0.08), transparent 60%),
+    #08090a;
 }
 </style>

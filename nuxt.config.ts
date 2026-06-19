@@ -7,12 +7,19 @@ dotenvConfig({ path: '.env' });
 export default defineNuxtConfig({
   compatibilityDate: '2026-06-15',
   modules: [
-      '@pinia/nuxt',
-      '@primevue/nuxt-module',
+    '@pinia/nuxt',
+    '@primevue/nuxt-module',
   ],
+  vite: {
+    server: {
+      watch: {
+        usePolling: true
+      }
+    }
+  },
   primevue: {
     options: {
-      theme: {  
+      theme: {
         preset: Aura
       }
     }
@@ -20,10 +27,10 @@ export default defineNuxtConfig({
   devtools: {
     enabled: true,
   },
-  debug: true,
+  debug: false,
   alias: {
-    '~': fileURLToPath(new URL('./', import.meta.url)),
     '@': fileURLToPath(new URL('./app/', import.meta.url)),
+    '~': fileURLToPath(new URL('./', import.meta.url)),
   },
   postcss: {
     plugins: {
